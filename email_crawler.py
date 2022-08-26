@@ -57,6 +57,8 @@ def crawl(keywords):
 	# eg http://www.google.com/search?q=singapore+web+development&start=0
 	# Next page: https://www.google.com/search?q=singapore+web+development&start=10
 	# Google search results are paged with 10 urls each. There are also adurls
+	urls = 0
+	adurls = 0
 	for page_index in range(0, MAX_SEARCH_RESULTS, 10):
 		query = {'q': keywords}
 		url = 'http://www.google.com/search?' + urllib.urlencode(query) + '&start=' + str(page_index)
@@ -64,8 +66,12 @@ def crawl(keywords):
 		# 	print("data: \n%s" % data)
 		for url in google_url_regex.findall(data):
 			db.enqueue(unicode(url))
+			urls += 1
 		for url in google_adurl_regex.findall(data):
 			db.enqueue(unicode(url))
+			adurls += 1
+
+	logger.info("collected %d urls and %d adurls" % (urls, adurls))
 
 	# Step 2: Crawl each of the search result
 	# We search till level 2 deep
@@ -121,11 +127,13 @@ def find_emails_2_level_deep(url):
 
 	if (len(email_set) > 0):
 		# If there is a email, we stop at level 1.
+		logger.info('Email found for %s at level 1', url )
 		return email_set
 
 	else:
 		# No email at level 1. Crawl level 2
-		logger.info('No email at level 1.. proceeding to crawl level 2')
+
+		logger.info('No email for %s at level 1.. proceeding to crawl level 2', url )
 
 		link_set = find_links_in_html_with_same_hostname(url, html)
 		for link in link_set:
@@ -136,6 +144,8 @@ def find_emails_2_level_deep(url):
 				continue
 			email_set = find_emails_in_html(html)
 			db.enqueue(link, list(email_set))
+			if len(email_set) > 0:
+				break
 
 		# We return an empty set
 		return set()
@@ -146,7 +156,8 @@ def find_emails_in_html(html):
 		return set()
 	email_set = set()
 	for email in email_regex.findall(html):
-		email_set.add(email)
+		if not (email.endswith(".jpg") or email.endswith(".png")):
+			email_set.add(email)
 	return email_set
 
 
